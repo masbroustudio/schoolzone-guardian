@@ -95,6 +95,24 @@ We have fully implemented and deployed the following core decision intelligence 
   * `volunteer_gaps_tool` — Cross-references guard shifts with high-risk windows to recommend safety coverage.
 * **Analytics Suggestion Chips:** Added quick-action chip buttons in the chat interface to trigger advanced queries instantly.
 
+### 4. BigQuery ML Predictive Risk Forecasting (Feature 2)
+* **Time-Series Forecasting:** Queries a BigQuery ML ARIMA time-series model (`risk_forecast_model`) to project safety levels for the upcoming week based on historical collisions.
+* **Seasonal Simulator Fallback:** Seamlessly falls back to a seasonal ARIMA-like local simulator when database access is offline.
+* **Weekly Forecast Dashboard:** Renders a clean 7-day predictive risk chart showing predicted score ranges for each day.
+
+### 5. Cloud Scheduler & Pub/Sub Workflow Automation (Feature 7)
+* **Event-Driven Pipeline:** Simulates Cloud Scheduler triggering weather ingestions and Pub/Sub topics publishing coordinates.
+* **Automated Safety Alerting:** Automatically detects when the computed risk score breaches a threshold (70.0) and publishes events to create alerts in the school safety bulletin.
+* **Interactive Logs Console:** Displays a live console printout on the admin panel showing event tracing logs through the GCP workflow.
+
+### 6. ADK Multi-Agent Orchestration (Feature 4)
+* **Specialized Agent Persons:** Moved from a single chatbot model to a team of specialized sub-agents:
+  * `Orchestrator Agent` ("Guardian Central") — Parses query intent and routes it.
+  * `Risk Analyst Agent` — Specializes in school profiles, weather, and active hazard data.
+  * `Route Advisor Agent` — Specializes in comparison analytics and timing recommendations.
+  * `Admin Planner Agent` — Specializes in crossing guard rosters and volunteer gaps.
+* **ADK Trace Console:** Renders an execution trace list showing exactly how Orchestrator routes tasks to sub-agents.
+
 ---
 
 ## 🏆 Hackathon Strategic Pillars
@@ -102,4 +120,5 @@ We have fully implemented and deployed the following core decision intelligence 
 1. **High Viability & Portability:** Uses NYC Open Data (NYPD vehicle collisions) and public weather feeds which are portable to any city in 48 hours.
 2. **Cost-Effective Scalability:** Offloads spatial processing to pre-computed scheduled queries in BigQuery and caches JSON payloads in memory (Redis), allowing serverless execution for under $50/month.
 3. **Zero-Hallucination Grounded AI:** Limits Vertex AI Gemini agent queries to database function calls, ensuring safe and Demographics-blind safety indices.
+
 
