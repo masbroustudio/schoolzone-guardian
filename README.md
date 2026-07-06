@@ -74,7 +74,7 @@ The server will start at **`http://127.0.0.1:8000`**. Open this URL in your web 
 
 ---
 
-## ✨ Completed Implementations (Tier 1 Features)
+## ✨ Completed Implementations (Tier 1 & Tier 2 Features)
 
 We have fully implemented and deployed the following core decision intelligence systems:
 

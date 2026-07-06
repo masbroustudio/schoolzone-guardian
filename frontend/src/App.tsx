@@ -282,12 +282,79 @@ function LandingPage({ navigateTo, theme, toggleTheme, user }: { navigateTo: (pa
         </div>
       </section>
 
+      {/* Features Showcase Grid */}
+      <section className="features-showcase" style={{ backgroundColor: 'var(--bg-secondary)', padding: '60px 0', borderTop: '2px solid var(--border-color)', borderBottom: '2px solid var(--border-color)' }}>
+        <div className="container">
+          <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+            <h2 style={{ fontSize: '32px', marginBottom: '12px' }}>🔒 Intelligent Safety Features</h2>
+            <p style={{ fontSize: '16px', color: 'var(--text-secondary)' }}>Powered by the Google Cloud ecosystem, Zone Guardian delivers state-of-the-art safety analytics.</p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+            {/* Feature 1 */}
+            <div className="lingo-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-color)', padding: '24px', borderRadius: '12px', border: '2px solid var(--border-color)', textAlign: 'left' }}>
+              <div style={{ fontSize: '32px' }}>💬</div>
+              <h3 style={{ margin: 0 }}>RAG-Grounded Safety Chat</h3>
+              <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>
+                Get zero-hallucination travel tips and route timing guidelines. The Vertex AI chat uses Retrieval-Augmented Generation to ground answers directly in weather feeds, NYPD crashes, and hazards.
+              </p>
+            </div>
+
+            {/* Feature 2 */}
+            <div className="lingo-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-color)', padding: '24px', borderRadius: '12px', border: '2px solid var(--border-color)', textAlign: 'left' }}>
+              <div style={{ fontSize: '32px' }}>🔍</div>
+              <h3 style={{ margin: 0 }}>Explainable AI Risk Breakdown</h3>
+              <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>
+                Complete transparency. See the exact mathematical contributions (such as precipitation probability, active construction closures, and guard shifts) that calculate every 15-minute score.
+              </p>
+            </div>
+
+            {/* Feature 3 */}
+            <div className="lingo-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-color)', padding: '24px', borderRadius: '12px', border: '2px solid var(--border-color)', textAlign: 'left' }}>
+              <div style={{ fontSize: '32px' }}>📈</div>
+              <h3 style={{ margin: 0 }}>BigQuery ML ARIMA Forecasting</h3>
+              <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>
+                Predictive weekly forecasts. Zone Guardian connects to a BigQuery ML ARIMA time-series model to forecast risk multipliers for the upcoming week based on historical density.
+              </p>
+            </div>
+
+            {/* Feature 4 */}
+            <div className="lingo-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-color)', padding: '24px', borderRadius: '12px', border: '2px solid var(--border-color)', textAlign: 'left' }}>
+              <div style={{ fontSize: '32px' }}>⚙️</div>
+              <h3 style={{ margin: 0 }}>Scheduler & Pub/Sub Automation</h3>
+              <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>
+                Scheduled event-driven workflow pipeline. Simulates Cloud Scheduler publishing to Pub/Sub to trigger weather updates, risk calculations, and create automated PTA hazard alerts.
+              </p>
+            </div>
+
+            {/* Feature 5 */}
+            <div className="lingo-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-color)', padding: '24px', borderRadius: '12px', border: '2px solid var(--border-color)', textAlign: 'left' }}>
+              <div style={{ fontSize: '32px' }}>🤖</div>
+              <h3 style={{ margin: 0 }}>ADK Multi-Agent Orchestration</h3>
+              <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>
+                Coordinated sub-agent routing. Parses complex queries and dispatches specialized sub-agents (Risk Analyst, Route Advisor, Admin Planner) to coordinate guard shifts and recommendations.
+              </p>
+            </div>
+
+            {/* Feature 6 */}
+            <div className="lingo-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-color)', padding: '24px', borderRadius: '12px', border: '2px solid var(--border-color)', textAlign: 'left' }}>
+              <div style={{ fontSize: '32px' }}>🗺️</div>
+              <h3 style={{ margin: 0 }}>Spatial Incident GIS Join</h3>
+              <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>
+                Pre-aggregated school-zone buffers. Integrates NYC geographic boundaries and runs spatial intersects with NYPD motor vehicle collision tables to construct precise risk envelopes.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <footer style={{ marginTop: 'auto', borderTop: '2px solid var(--border-color)', padding: '16px 0', textAlign: 'center' }}>
         <p>&copy; 2026 School-Zone Guardian. Built for Google Cloud Hackathon. All rights reserved.</p>
       </footer>
     </div>
   );
 }
+
 
 /* ==========================================================================
    LOGIN PAGE COMPONENT
