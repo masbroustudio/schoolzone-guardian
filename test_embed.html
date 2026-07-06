@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Looker Studio Embed Diagnostic Tool</title>
+</head>
+<body style="font-family: Arial, sans-serif; padding: 40px; background-color: #f1f3f4; text-align: center;">
+    <h2>Looker Studio Embed Diagnostic Tool</h2>
+    <p>Testing Google's raw, un-modified Looker Studio iframe code.</p>
+    
+    <div style="margin: 20px auto; max-width: 800px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <!-- Google Data Studio Raw Embed Iframe -->
+        <iframe width="600" height="450" src="https://datastudio.google.com/embed/reporting/1da83ff5-3b0d-4629-867c-a79475390cab/page/8W72F" frameborder="0" style="border:0; width: 100%; height: 500px;" allowfullscreen sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+    </div>
+    
+    <div style="margin-top: 20px; color: #555; font-size: 14px;">
+        <p><strong>Diagnosis Steps:</strong></p>
+        <p>1. If the report loads here, the embed works! The issue is dashboard page code integration.</p>
+        <p>2. If the report fails here too, it confirms that Chrome is blocking Google's third-party cookies or session resolver for your account inside iframes.</p>
+    </div>
+</body>
+</html>
