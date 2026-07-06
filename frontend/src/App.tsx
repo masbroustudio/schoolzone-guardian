@@ -572,7 +572,7 @@ function LandingPage({ navigateTo, theme, toggleTheme, user }: { navigateTo: (pa
       </section>
 
       <footer style={{ marginTop: 'auto', borderTop: '2px solid var(--border-color)', padding: '16px 0', textAlign: 'center', position: 'relative', zIndex: 5 }}>
-        <p>&copy; 2026 School-Zone Guardian. Built for Google Cloud Hackathon. All rights reserved.</p>
+        <p>&copy; 2026 School-Zone Guardian. Built by Yudha Elfransyah Powered. All rights reserved.</p>
       </footer>
     </div>
   );
