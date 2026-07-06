@@ -521,6 +521,15 @@ function DashboardPage({ user, handleLogout, theme, toggleTheme }: { user: any; 
   // Volunteer shifts list
   const [volunteerRoster, setVolunteerRoster] = useState<VolunteerShift[]>([]);
 
+  // Predictive ARIMA & Automation states
+  const [arimaForecasts, setArimaForecasts] = useState<any[]>([]);
+  const [arimaLoading, setArimaLoading] = useState(false);
+  const [gcpMlActive, setGcpMlActive] = useState(false);
+  const [automationLogs, setAutomationLogs] = useState<string[]>([]);
+  const [automationLoading, setAutomationLoading] = useState(false);
+  const [activeAgentLogs, setActiveAgentLogs] = useState<string[]>([]);
+
+
   // Chatbot states
   const [chatHistory, setChatHistory] = useState<ChatBubble[]>([
     { sender: 'bot', text: "Hello! I am Guardy, your School-Zone Guardian AI assistant. 🦉\n\nI have analyzed the spatial datasets for this school.\n\nHere is a quick snapshot of the current safety profile:\n* Nearby historical collisions: 28 incidents.\n* Primary Hazard Factor: High density drop-off double-parking.\n\nYou can ask me questions like:\n* _'When is the safest time to drop off my kids?'_\n* _'What are the main risk factors here?'_\n* _'How does rain affect the risk index?'_" }
@@ -607,7 +616,7 @@ function DashboardPage({ user, handleLogout, theme, toggleTheme }: { user: any; 
     }
   };
 
-  // Load Latest Safety Briefing
+  // Load latest safety briefing
   const loadLatestBriefing = async () => {
     try {
       const response = await fetch(`/api/newsletter/latest?school_id=${selectedSchool.id}`);
@@ -620,13 +629,32 @@ function DashboardPage({ user, handleLogout, theme, toggleTheme }: { user: any; 
     }
   };
 
+  // Fetch BigQuery ML ARIMA forecasting weekly trend
+  const loadSchoolPredictiveForecast = async () => {
+    setArimaLoading(true);
+    try {
+      const response = await fetch(`/api/predictive/forecast?school_id=${selectedSchool.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setArimaForecasts(data.forecasts || []);
+        setGcpMlActive(data.gcp_ml_active || false);
+      }
+    } catch (e) {
+      console.error("Failed to load arima forecasts: ", e);
+    } finally {
+      setArimaLoading(false);
+    }
+  };
+
   // Reload everything when school, rain probability, simulator variables change
   useEffect(() => {
     loadSchoolRiskData();
     loadActiveHazards();
     loadVolunteerShifts();
     loadLatestBriefing();
+    loadSchoolPredictiveForecast();
   }, [selectedSchool, rainProb, guardCount, laneClosure, parentCompliance]);
+
 
   // Handle volunteer creation using browser native prompt popups
   const handleAddVolunteerPrompts = async () => {
@@ -725,6 +753,9 @@ function DashboardPage({ user, handleLogout, theme, toggleTheme }: { user: any; 
       const data = await response.json();
       if (response.ok) {
         setChatHistory(prev => [...prev, { sender: 'bot', text: data.reply, grounded: data.gemini_active }]);
+        if (data.agent_logs) {
+          setActiveAgentLogs(data.agent_logs);
+        }
       } else {
         setChatHistory(prev => [...prev, { sender: 'bot', text: `⚠️ Error: ${data.detail || 'Server connection failed.'}` }]);
       }
@@ -734,6 +765,7 @@ function DashboardPage({ user, handleLogout, theme, toggleTheme }: { user: any; 
       setChatLoading(false);
     }
   };
+
 
   // Markdown parsing helper for AI chatbot bubbles
   const formatMarkdown = (text: string) => {
@@ -1237,8 +1269,45 @@ function DashboardPage({ user, handleLogout, theme, toggleTheme }: { user: any; 
                 </div>
               </div>
 
+              {/* Feature 2: BigQuery ML ARIMA Time-Series Risk Forecasting */}
+              <div className="lingo-card" style={{ marginTop: '24px', textAlign: 'left' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h3 style={{ fontSize: '20px', margin: 0 }}>📈 BigQuery ML — 7-Day Safety Risk Forecast</h3>
+                  <span style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '12px', background: gcpMlActive ? 'rgba(88, 204, 2, 0.12)' : 'var(--bg-secondary)', color: gcpMlActive ? '#58cc02' : 'var(--text-secondary)', fontWeight: 800 }}>
+                    {gcpMlActive ? "📡 Live BigQuery ML (ARIMA+)" : "⚡ Local ARIMA Simulator"}
+                  </span>
+                </div>
+                
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: '1.5' }}>
+                  Autoregressive Integrated Moving Average (ARIMA) projection utilizing NYC NYPD Crash database tables to predict safety levels for the upcoming week.
+                </p>
+
+                {arimaLoading ? (
+                  <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    <span>Loading ML projections...</span>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '12px' }}>
+                    {arimaForecasts.map((f, i) => {
+                      const scoreColor = f.predicted_risk >= 70 ? '#ff4b4b' : f.predicted_risk >= 40 ? '#ffc800' : '#58cc02';
+                      return (
+                        <div key={i} style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '8px', border: '1.5px solid var(--border-color)', textAlign: 'center' }}>
+                          <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>{f.day.slice(0, 3)}</div>
+                          <div style={{ fontSize: '10px', color: 'var(--text-secondary)', margin: '2px 0 6px 0' }}>{f.date.slice(5)}</div>
+                          <div style={{ fontSize: '22px', fontWeight: 800, color: scoreColor }}>{Math.round(f.predicted_risk)}</div>
+                          <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '4px', fontWeight: 700 }}>
+                            Range: {Math.round(f.lower_bound)}-{Math.round(f.upper_bound)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
             </div>
           )}
+
 
           {/* ==================== PANEL: GUARDIAN AI CHAT ==================== */}
           {activeTab === 'chat' && (
@@ -1286,6 +1355,22 @@ function DashboardPage({ user, handleLogout, theme, toggleTheme }: { user: any; 
                     </div>
                   )}
                 </div>
+
+                {activeAgentLogs.length > 0 && (
+                  <div style={{ background: 'var(--bg-secondary)', padding: '10px 24px', borderTop: '2px solid var(--border-color)', fontSize: '11px', textAlign: 'left' }}>
+                    <details open>
+                      <summary style={{ fontWeight: 800, cursor: 'pointer', color: 'var(--text-secondary)' }}>🤖 ADK Multi-Agent Execution Trace</summary>
+                      <ul style={{ margin: '6px 0 0 0', paddingLeft: '20px', listStyleType: 'none', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {activeAgentLogs.map((log, index) => (
+                          <li key={index} style={{ fontFamily: 'monospace', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                            {log}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </div>
+                )}
+
 
                 <div style={{ display: 'flex', gap: '8px', padding: '12px 24px', flexWrap: 'wrap', borderTop: '2px solid var(--border-color)', background: 'var(--bg-secondary)' }}>
                   <button onClick={() => handleChatSubmit(undefined, "When is the safest time to drop off my children?")} className="btn-tactile" style={{ fontSize: '11px', padding: '6px 12px' }}>🕒 Safest Drop-off Windows</button>
@@ -1548,6 +1633,100 @@ function DashboardPage({ user, handleLogout, theme, toggleTheme }: { user: any; 
                   ))}
                 </div>
               </div>
+
+              {/* Feature 7: Cloud Scheduler & Pub/Sub Workflow Automation Console */}
+              <div className="lingo-card" style={{ marginTop: '24px', textAlign: 'left' }}>
+                <h3 style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ⚙️ GCP Workflow Automation Console (Scheduler & Pub/Sub)
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: '1.5' }}>
+                  Simulate a scheduled event from <strong>Cloud Scheduler</strong> publishing to the <code>weather-updated</code> and <code>safety-alert-needed</code> <strong>Pub/Sub Topics</strong>. Triggers automated safety score recalculation and alert notifications.
+                </p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '24px', flexWrap: 'wrap' }}>
+                  {/* Left Column: Parameter controls */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-secondary)', padding: '16px', borderRadius: '8px', border: '1.5px solid var(--border-color)' }}>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 800 }}>Simulate Event Inputs</h4>
+                    
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                        <span>Precipitation probability:</span>
+                        <span style={{ color: 'var(--lingo-blue)' }}>{Math.round(rainProb * 100)}%</span>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="1" 
+                        step="0.1" 
+                        value={rainProb} 
+                        onChange={(e) => setRainProb(parseFloat(e.target.value))}
+                        style={{ width: '100%', cursor: 'pointer' }}
+                      />
+                    </div>
+
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+                      <input 
+                        type="checkbox" 
+                        id="simulate-hazard-checkbox"
+                        style={{ width: '16px', height: '16px' }}
+                      />
+                      <span>Simulate New Hazard (Blocking)</span>
+                    </label>
+
+                    <button 
+                      onClick={async () => {
+                        setAutomationLoading(true);
+                        try {
+                          const simulateHazard = (document.getElementById('simulate-hazard-checkbox') as HTMLInputElement)?.checked || false;
+                          const res = await fetch('/api/automation/trigger', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              school_id: selectedSchool.id,
+                              simulate_rain_change: rainProb,
+                              simulate_new_hazard: simulateHazard
+                            })
+                          });
+                          if (res.ok) {
+                            const data = await res.json();
+                            setAutomationLogs(data.event_logs || []);
+                            loadActiveHazards(); // Reload active hazards to show the automated alert!
+                          }
+                        } catch (err) {
+                          console.error("Automation error: ", err);
+                        } finally {
+                          setAutomationLoading(false);
+                        }
+                      }}
+                      className="btn-tactile btn-blue" 
+                      style={{ width: '100%', padding: '10px', fontSize: '13px', fontWeight: 800 }}
+                    >
+                      🚀 Run Cloud Scheduler Trigger
+                    </button>
+                  </div>
+
+                  {/* Right Column: Console Log output */}
+                  <div style={{ display: 'flex', flexDirection: 'column', background: '#1e1e1e', borderRadius: '8px', padding: '16px', border: '2px solid #333', minHeight: '220px', overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333', paddingBottom: '8px', marginBottom: '12px' }}>
+                      <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#888', fontWeight: 700 }}>LIVE GCP EVENT LOGS</span>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: automationLoading ? '#ffc800' : '#58cc02', animation: automationLoading ? 'pulse 1s infinite' : 'none' }}></span>
+                    </div>
+
+                    <div style={{ flexGrow: 1, fontFamily: 'monospace', fontSize: '11px', color: '#00ff00', textAlign: 'left', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {automationLogs.length === 0 ? (
+                        <span style={{ color: '#888', fontStyle: 'italic' }}>Console idle. Click "Run Cloud Scheduler Trigger" to execute daily morning workflow...</span>
+                      ) : (
+                        automationLogs.map((log, index) => (
+                          <div key={index} style={{ borderBottom: '1px solid #252525', paddingBottom: '4px' }}>
+                            {log}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
 
             </div>
           )}

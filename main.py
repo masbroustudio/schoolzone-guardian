@@ -285,6 +285,76 @@ def fetch_bigquery_risk_slots(school_name: str, rain_prob: float) -> Optional[Li
         print(f"BigQuery live query fallback: {e}")
         return None
 
+
+def fetch_bigquery_arima_forecast(school_id: str) -> Optional[List[dict]]:
+    if not HAS_BIGQUERY:
+        return None
+    try:
+        client = bigquery.Client(project="juaravibe01")
+        # Query ARIMA forecasting values
+        query = """
+            SELECT 
+                EXTRACT(DATE FROM forecast_timestamp) AS forecast_date,
+                forecast_value,
+                confidence_interval_lower_bound AS lower_bound,
+                confidence_interval_upper_bound AS upper_bound
+            FROM ML.FORECAST(MODEL `juaravibe01.safety_dataset.risk_forecast_model`, STRUCT(7 AS horizon, 0.9 AS confidence_level))
+            ORDER BY forecast_date ASC
+        """
+        query_job = client.query(query)
+        results = list(query_job.result())
+        
+        forecasts = []
+        for row in results:
+            forecast_date = row.forecast_date
+            day_name = forecast_date.strftime("%A")
+            # Map ARIMA baseline values into 0-100 safety scale
+            predicted = round(max(5.0, min(98.0, row.forecast_value)), 1)
+            lower = round(max(2.0, min(95.0, row.lower_bound)), 1)
+            upper = round(max(10.0, min(99.0, row.upper_bound)), 1)
+            forecasts.append({
+                "date": str(forecast_date),
+                "day": day_name,
+                "predicted_risk": predicted,
+                "lower_bound": lower,
+                "upper_bound": upper
+            })
+        return forecasts
+    except Exception as e:
+        print(f"BigQuery ML forecast lookup failed: {e}")
+        return None
+
+
+def generate_heuristic_arima_forecast(base_risk: float) -> List[dict]:
+    forecasts = []
+    today = datetime.date.today()
+    # Mock a standard seasonal time series trend
+    for i in range(1, 8):
+        forecast_date = today + datetime.timedelta(days=i)
+        day_name = forecast_date.strftime("%A")
+        
+        # Weekend risk is low, weekday risk has variation
+        if day_name in ("Saturday", "Sunday"):
+            predicted = 15.0 + random.uniform(-3, 3)
+        else:
+            # Add a slight weekly trend variation
+            trend = math.sin(i / 1.5) * 10.0
+            predicted = base_risk + trend + random.uniform(-4, 4)
+            
+        predicted = max(5.0, min(95.0, predicted))
+        lower = max(2.0, predicted - 8.0 - random.uniform(0, 3))
+        upper = min(99.0, predicted + 8.0 + random.uniform(0, 3))
+        
+        forecasts.append({
+            "date": str(forecast_date),
+            "day": day_name,
+            "predicted_risk": round(predicted, 1),
+            "lower_bound": round(lower, 1),
+            "upper_bound": round(upper, 1)
+        })
+    return forecasts
+
+
 # User Sign-In Pydantic Models and Helper Functions
 class LoginRequest(BaseModel):
     email: str
@@ -519,6 +589,11 @@ class VolunteerShiftCreate(BaseModel):
     assigned_zone: str
     time_window: str
     shift_date: str
+
+class AutomationTriggerRequest(BaseModel):
+    school_id: str
+    simulate_rain_change: Optional[float] = None
+    simulate_new_hazard: Optional[bool] = None
 
 # Tool definitions for Gemini function calling (NLI Analytics)
 def database_lookup_tool(school_name: str, time_window: Optional[str] = None) -> str:
@@ -929,6 +1004,86 @@ async def add_volunteer(shift: VolunteerShiftCreate, authorization: Optional[str
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.get("/api/predictive/forecast")
+async def get_predictive_forecast(school_id: str):
+    school = next((s for s in SCHOOLS_DB if s["id"] == school_id), None)
+    if not school:
+        raise HTTPException(status_code=404, detail="School not found")
+        
+    # Attempt BigQuery ML ARIMA prediction
+    forecasts = fetch_bigquery_arima_forecast(school_id)
+    used_ml = forecasts is not None
+    
+    if not forecasts:
+        # Fallback to local heuristic ARIMA simulation
+        forecasts = generate_heuristic_arima_forecast(school["base_risk"])
+        
+    return {
+        "status": "success",
+        "school_id": school_id,
+        "school_name": school["name"],
+        "forecasts": forecasts,
+        "gcp_ml_active": used_ml
+    }
+
+
+@app.post("/api/automation/trigger")
+async def trigger_automated_safety_workflow(req: AutomationTriggerRequest):
+    """
+    Simulates a daily scheduled job triggered by Cloud Scheduler.
+    Executes a Pub/Sub event chain to ingest weather, compute risk scores,
+    and generate safety alerts.
+    """
+    logs = []
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    logs.append(f"[{timestamp}] ⏰ [Cloud Scheduler] Triggered morning safety ingestion pipeline.")
+    
+    rain_prob = req.simulate_rain_change if req.simulate_rain_change is not None else 0.4
+    logs.append(f"[{timestamp}] 🛰️ [Pub/Sub Topic: weather-updated] Published event with rain_probability={rain_prob}")
+    
+    school = next((s for s in SCHOOLS_DB if s["id"] == req.school_id), None)
+    school_name = school["name"] if school else "Selected School"
+    base_risk = school["base_risk"] if school else 50.0
+    
+    # Simulate calculations
+    predicted_risk = base_risk * (1.0 + rain_prob * 0.4)
+    if req.simulate_new_hazard:
+        predicted_risk += 15.0
+        
+    logs.append(f"[{timestamp}] 🧠 [Cloud Function: Calculate Risk] Recalculated risk. School: '{school_name}'. Predicted Peak Risk: {round(predicted_risk, 1)}/100")
+    
+    alert_triggered = False
+    if predicted_risk >= 70.0:
+        alert_triggered = True
+        logs.append(f"[{timestamp}] 🚨 [Pub/Sub Topic: safety-alert-needed] Peak risk {round(predicted_risk, 1)} exceeds threshold (70.0). Publishing Alert Event.")
+        
+        # Trigger Cloud Function Alert generator
+        alert_msg = f"Automated Alert: Peak bell-time risk is high ({round(predicted_risk, 1)}/100) due to wet road conditions and local congestive drops."
+        logs.append(f"[{timestamp}] 🛡️ [Cloud Function: Generate Alert] Created alert bulletin: '{alert_msg}'")
+        
+        # Save alert to operational DB
+        database.add_hazard(
+            school_id=req.school_id,
+            description=alert_msg,
+            severity_multiplier=1.2,
+            hazard_type="AUTOMATED_ALERT"
+        )
+        logs.append(f"[{timestamp}] 💾 [Database] Successfully saved automated alert to school_hazards table.")
+    else:
+        logs.append(f"[{timestamp}] 🟢 [Calculate Risk] Predicted risk is below alert threshold. No alert events published.")
+        
+    # Trigger newsletter briefing automation
+    logs.append(f"[{timestamp}] 🦉 [Cloud Function: Daily Briefing Generator] Initiating Guardy safety weekly newsletter compiler.")
+    
+    return {
+        "status": "success",
+        "alert_triggered": alert_triggered,
+        "predicted_risk": round(predicted_risk, 1),
+        "event_logs": logs
+    }
+
+
 @app.post("/api/chat")
 async def chat_with_agent(req: ChatRequest):
     school = next((s for s in SCHOOLS_DB if s["id"] == req.school_id), None)
@@ -944,6 +1099,8 @@ async def chat_with_agent(req: ChatRequest):
     
     response_text = ""
     used_gemini = False
+    agent_logs = []
+    agent_logs.append("🤖 [Orchestrator Agent] Received user safety query.")
     
     if HAS_GEMINI_SDK:
         try:
@@ -954,18 +1111,60 @@ async def chat_with_agent(req: ChatRequest):
                 gcp_project = os.environ.get("GOOGLE_CLOUD_PROJECT", "juaravibe01")
                 client = genai.Client(vertexai=True, project=gcp_project, location="us-central1")
             
+            # --- ADK Feature 4: Orchestrator Agent decides target specialized agent ---
+            routing_prompt = (
+                "You are the Orchestrator Agent. Classify the user query into one of three specialized sub-agents:\n"
+                "1. 'RISK_ANALYST' (If query is about daily safety index, hazards, weather, or basic lookups)\n"
+                "2. 'ROUTE_ADVISOR' (If query is about drop-off time recommendations, routes, or comparing schools)\n"
+                "3. 'ADMIN_PLANNER' (If query is about volunteers, scheduling, newsletters, or coverage gaps)\n\n"
+                f"Query: '{req.message}'\n"
+                "Reply with EXACTLY one word: RISK_ANALYST, ROUTE_ADVISOR, or ADMIN_PLANNER."
+            )
+            routing_response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=routing_prompt,
+                config=types.GenerateContentConfig(temperature=0.0)
+            )
+            target_agent = routing_response.text.strip().upper()
+            if target_agent not in ("RISK_ANALYST", "ROUTE_ADVISOR", "ADMIN_PLANNER"):
+                target_agent = "RISK_ANALYST"
+                
+            if target_agent == "RISK_ANALYST":
+                agent_name = "Risk Analyst Agent"
+                agent_instruction = (
+                    "You are the 'Risk Analyst Agent'. You specialize in school profile data, crash statistics, hazards, and weather.\n"
+                    "Use ONLY the database_lookup_tool for query handling. Cite context documents."
+                )
+                agent_tools = [database_lookup_tool]
+            elif target_agent == "ROUTE_ADVISOR":
+                agent_name = "Route Advisor Agent"
+                agent_instruction = (
+                    "You are the 'Route Advisor Agent'. You specialize in school comparison analytics and travel timing recommendations.\n"
+                    "Use compare_schools_tool or analyze_trends_tool for query handling. Cite context documents."
+                )
+                agent_tools = [compare_schools_tool, analyze_trends_tool]
+            else:
+                agent_name = "Admin Planner Agent"
+                agent_instruction = (
+                    "You are the 'Admin Planner Agent'. You specialize in parent volunteer shifts and coverage gap analysis.\n"
+                    "Use volunteer_gaps_tool for query handling. Cite context documents."
+                )
+                agent_tools = [volunteer_gaps_tool]
+                
+            agent_logs.append(f"🔄 [Orchestrator Agent] Dispatched task to specialized sub-agent: {agent_name}")
+            
             # --- RAG Step 2: Augmented system prompt with retrieved context ---
             system_instruction = (
-                "You are 'Guardian AI,' a friendly, expert safety assistant representing the School-Zone Guardian platform.\n"
-                "You help parents, administrators, and volunteers assess drop-off/pickup risk windows.\n\n"
+                f"You are the '{agent_name}' on the School-Zone Guardian platform.\n"
+                "You assist the Orchestrator Agent in answering user questions.\n\n"
                 "CONSTRAINTS & RULES:\n"
                 "1. ALWAYS ground your risk assessments in the RETRIEVED CONTEXT DOCUMENTS provided below. Cite document numbers (e.g., [DOC 1], [DOC 2]).\n"
                 "2. Categorize risk scores (0-100) into Low (Green, 0-39), Medium (Yellow, 40-69), or High (Red, 70-100).\n"
                 "3. Recommend alternative timing windows when high risk is identified.\n"
                 "4. RESPONSIBLE AI: Never reference race, household income, socioeconomic status, or policing. Focus strictly on physical road safety variables.\n"
                 "5. Keep responses brief, friendly, structured in Markdown, and use bullet points and emoji.\n"
-                "6. If data is missing or insufficient, clearly state the limitation rather than speculating.\n"
-                "7. When comparing schools or analyzing trends, use the provided analytics tools for accurate data.\n\n"
+                "6. If data is missing or insufficient, clearly state the limitation rather than speculating.\n\n"
+                f"{agent_instruction}\n\n"
                 "--- RETRIEVED CONTEXT DOCUMENTS (Use these to ground your response) ---\n"
                 f"{rag_context_text}\n"
                 "--- END OF CONTEXT ---"
@@ -977,12 +1176,13 @@ async def chat_with_agent(req: ChatRequest):
                 contents=req.message,
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
-                    tools=[database_lookup_tool, compare_schools_tool, analyze_trends_tool, volunteer_gaps_tool],
+                    tools=agent_tools,
                     temperature=0.3
                 )
             )
             
             response_text = response.text
+            agent_logs.append(f"🧠 [{agent_name}] Processed query with tools and grounded context.")
             used_gemini = True
             
         except Exception as e:
@@ -1000,14 +1200,17 @@ async def chat_with_agent(req: ChatRequest):
         if "compare" in msg or "all school" in msg or "which" in msg and "safest" in msg:
             # NLI: School comparison query
             response_text = compare_schools_tool()
+            agent_name = "Route Advisor Agent"
             
         elif "trend" in msg or "weekly" in msg or "pattern" in msg or "analysis" in msg:
             # NLI: Trend analysis query
             response_text = analyze_trends_tool(school_name)
+            agent_name = "Route Advisor Agent"
             
         elif "volunteer" in msg or "guard" in msg or "coverage" in msg or "gap" in msg:
             # NLI: Volunteer gaps query
             response_text = volunteer_gaps_tool(school_name)
+            agent_name = "Admin Planner Agent"
 
         elif "when" in msg or "safe" in msg or "time" in msg or "recommend" in msg:
             response_text = (
@@ -1017,6 +1220,7 @@ async def chat_with_agent(req: ChatRequest):
                 f"* **Recommended Timing 🟢:** Arriving in the **07:30-07:45** or **08:30-08:45** windows reduces drop-off risk by up to **45%** because traffic volume drops and visibility is significantly better.\n"
                 f"* **Current Dynamic Factors 🌦️:** Moderate road wetness and localized double-parking lanes increase overall caution requirements. Drive slowly (under 15mph) and prioritize pedestrian walks."
             )
+            agent_name = "Route Advisor Agent"
         elif "why" in msg or "factor" in msg or "reason" in msg or "risk" in msg:
             response_text = (
                 f"### 📊 Risk Drivers for {school_name}\n\n"
@@ -1026,6 +1230,7 @@ async def chat_with_agent(req: ChatRequest):
                 f"3. **Bell-Time Influx:** High student volume entering at 8:00 AM leads to sudden pedestrian crowding near crossing walks.\n\n"
                 f"*Suggestion: Encourage carpooling to drop off 2 blocks away at designated visual zones.*"
             )
+            agent_name = "Risk Analyst Agent"
         else:
             # Enrich default greeting with RAG context data
             hazard_count = len(rag_context.get("active_hazards", []))
@@ -1045,13 +1250,19 @@ async def chat_with_agent(req: ChatRequest):
                 f"* _'Analyze volunteer coverage gaps'_\n"
                 f"* _'Show me the weekly trend analysis'_"
             )
+            agent_name = "Risk Analyst Agent"
+
+        agent_logs.append(f"🔄 [Orchestrator Agent] Offline rules routing dispatched task to sub-agent: {agent_name}")
+        agent_logs.append(f"🧠 [{agent_name}] Processed query using offline heuristics.")
 
     return {
         "reply": response_text,
         "gemini_active": used_gemini,
         "rag_sources": rag_context["sources_successful"],
-        "rag_total": rag_context["sources_queried"]
+        "rag_total": rag_context["sources_queried"],
+        "agent_logs": agent_logs
     }
+
 
 @app.post("/api/hazards/upload")
 async def upload_hazard_photo(school_id: str, file: UploadFile = File(...), authorization: Optional[str] = Header(None)):
