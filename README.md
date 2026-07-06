@@ -2,7 +2,7 @@
 
 An AI-powered Decision Intelligence Platform built for Google Cloud Hackathon. It predicts risky 15-minute school drop-off/pick-up windows and suggests safer routes, timings, and patrol rosters for parents and school administrators.
 
-GCP Project ID: `juaravibe01`
+GCP Project ID: `project_name`
 Aesthetic Theme: **Lingo** (Duolingo-inspired playful, tactile 3D elements)
 
 ---
@@ -59,7 +59,7 @@ The server will start at **`http://127.0.0.1:8000`**. Open this URL in your web 
 
 ---
 
-## ☁️ Google Cloud Platform Integration (`juaravibe01`)
+## ☁️ Google Cloud Platform Integration (`project_name`)
 
 To configure GCP services, follow the guides below.
 
@@ -68,7 +68,7 @@ In your terminal, configure your active project:
 
 ```powershell
 # Set project
-gcloud config set project juaravibe01
+gcloud config set project project_name
 
 # Authorize application default credentials
 gcloud auth application-default login
