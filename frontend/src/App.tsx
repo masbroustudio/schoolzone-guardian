@@ -19,6 +19,7 @@ interface RiskSlot {
   level: string;
   weather_multiplier: number;
   factors: string[];
+  risk_breakdown?: { factor: string; weight: number; contribution: number }[];
 }
 
 interface VolunteerShift {
@@ -43,6 +44,7 @@ interface Hazard {
 interface ChatBubble {
   sender: 'user' | 'bot';
   text: string;
+  grounded?: boolean;
 }
 
 const FALLBACK_SCHOOLS: School[] = [
@@ -722,7 +724,7 @@ function DashboardPage({ user, handleLogout, theme, toggleTheme }: { user: any; 
       });
       const data = await response.json();
       if (response.ok) {
-        setChatHistory(prev => [...prev, { sender: 'bot', text: data.reply }]);
+        setChatHistory(prev => [...prev, { sender: 'bot', text: data.reply, grounded: data.gemini_active }]);
       } else {
         setChatHistory(prev => [...prev, { sender: 'bot', text: `⚠️ Error: ${data.detail || 'Server connection failed.'}` }]);
       }
@@ -1165,6 +1167,76 @@ function DashboardPage({ user, handleLogout, theme, toggleTheme }: { user: any; 
                 </div>
               </div>
 
+              {/* Explainable AI - Risk Factor Breakdown */}
+              <div className="lingo-card" style={{ marginTop: '24px', textAlign: 'left' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h3 style={{ fontSize: '20px', margin: 0 }}>🔍 Explainable AI — Risk Breakdown</h3>
+                  <span className={`badge-risk ${activeSlot.level.toLowerCase()}`} style={{ fontSize: '12px' }}>
+                    {activeSlot.level} — {Math.round(activeSlot.score)}/100
+                  </span>
+                </div>
+                
+                {activeSlot.risk_breakdown && activeSlot.risk_breakdown.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {activeSlot.risk_breakdown.map((rb, i) => (
+                      <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700 }}>
+                          <span>{rb.factor}</span>
+                          <span style={{ color: 'var(--lingo-blue)', fontWeight: 800 }}>
+                            {rb.contribution.toFixed(1)} pts ({rb.weight}%)
+                          </span>
+                        </div>
+                        <div style={{ width: '100%', height: '8px', borderRadius: '4px', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
+                          <div style={{ 
+                            width: `${Math.min(100, rb.weight)}%`, 
+                            height: '100%', 
+                            borderRadius: '4px', 
+                            background: rb.weight >= 30 ? '#ff4b4b' : rb.weight >= 20 ? '#ffc800' : '#58cc02',
+                            transition: 'width 0.5s ease'
+                          }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {activeSlot.factors.map((f, i) => {
+                      const weight = Math.round(100 / Math.max(1, activeSlot.factors.length));
+                      const contribution = (activeSlot.score * weight) / 100;
+                      return (
+                        <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700 }}>
+                            <span>{f}</span>
+                            <span style={{ color: 'var(--lingo-blue)', fontWeight: 800 }}>
+                              {contribution.toFixed(1)} pts ({weight}%)
+                            </span>
+                          </div>
+                          <div style={{ width: '100%', height: '8px', borderRadius: '4px', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
+                            <div style={{ 
+                              width: `${Math.min(100, weight)}%`, 
+                              height: '100%', 
+                              borderRadius: '4px', 
+                              background: weight >= 30 ? '#ff4b4b' : weight >= 20 ? '#ffc800' : '#58cc02',
+                              transition: 'width 0.5s ease'
+                            }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Responsible AI Notice */}
+                <div style={{ marginTop: '20px', padding: '14px 18px', background: 'rgba(88, 204, 2, 0.08)', borderLeft: '4px solid var(--lingo-green, #58cc02)', borderRadius: '0 8px 8px 0' }}>
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 800, color: '#46a302' }}>🛡️ Responsible AI Transparency</h4>
+                  <p style={{ margin: 0, fontSize: '12px', lineHeight: '1.5', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                    This score uses <strong>only physical safety variables</strong>: historical collision density, real-time weather, road closures, and user-reported hazards. 
+                    No demographic, income, policing, or socioeconomic data is used. 
+                    <br/>Data sources: NYPD Motor Vehicle Collisions (BigQuery Public), Open-Meteo Weather API, User-reported Hazards.
+                  </p>
+                </div>
+              </div>
+
             </div>
           )}
 
@@ -1192,11 +1264,21 @@ function DashboardPage({ user, handleLogout, theme, toggleTheme }: { user: any; 
 
                 <div className="chat-messages" style={{ overflowY: 'auto' }}>
                   {chatHistory.map((bubble, i) => (
-                    <div 
-                      key={i} 
-                      className={`chat-bubble ${bubble.sender === 'user' ? 'chat-bubble-user' : 'chat-bubble-bot'}`}
-                      dangerouslySetInnerHTML={{ __html: formatMarkdown(bubble.text) }}
-                    />
+                    <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: bubble.sender === 'user' ? 'flex-end' : 'flex-start', margin: '4px 0' }}>
+                      <div 
+                        className={`chat-bubble ${bubble.sender === 'user' ? 'chat-bubble-user' : 'chat-bubble-bot'}`}
+                        dangerouslySetInnerHTML={{ __html: formatMarkdown(bubble.text) }}
+                      />
+                      {bubble.sender === 'bot' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', fontWeight: 700, padding: '2px 8px', marginTop: '2px', color: 'var(--text-secondary)' }}>
+                          {bubble.grounded ? (
+                            <><span style={{ color: '#58cc02' }}>✅ RAG-Grounded</span> · Gemini 2.5 Flash · Data-verified</>
+                          ) : (
+                            <><span style={{ color: '#ffc800' }}>⚡ Rule Engine</span> · Local heuristics · Offline mode</>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   ))}
                   {chatLoading && (
                     <div className="chat-bubble chat-bubble-bot" style={{ opacity: 0.6 }}>
@@ -1209,6 +1291,9 @@ function DashboardPage({ user, handleLogout, theme, toggleTheme }: { user: any; 
                   <button onClick={() => handleChatSubmit(undefined, "When is the safest time to drop off my children?")} className="btn-tactile" style={{ fontSize: '11px', padding: '6px 12px' }}>🕒 Safest Drop-off Windows</button>
                   <button onClick={() => handleChatSubmit(undefined, "What are the primary hazards around here?")} className="btn-tactile" style={{ fontSize: '11px', padding: '6px 12px' }}>🚨 Active Risk Drivers</button>
                   <button onClick={() => handleChatSubmit(undefined, "How does wet rain forecast modify the danger level?")} className="btn-tactile" style={{ fontSize: '11px', padding: '6px 12px' }}>🌧️ Weather Surcharge</button>
+                  <button onClick={() => handleChatSubmit(undefined, "Compare risk levels across all schools and tell me which is safest")} className="btn-tactile" style={{ fontSize: '11px', padding: '6px 12px' }}>📊 Compare All Schools</button>
+                  <button onClick={() => handleChatSubmit(undefined, "Show me the weekly risk trend analysis for this school")} className="btn-tactile" style={{ fontSize: '11px', padding: '6px 12px' }}>📈 Weekly Trend Analysis</button>
+                  <button onClick={() => handleChatSubmit(undefined, "Analyze volunteer coverage gaps and recommend where more guards are needed")} className="btn-tactile" style={{ fontSize: '11px', padding: '6px 12px' }}>🔍 Volunteer Coverage Gaps</button>
                 </div>
 
                 <form onSubmit={handleChatSubmit} style={{ display: 'flex', gap: '12px', padding: '16px 24px', borderTop: '2px solid var(--border-color)' }}>

@@ -31,3 +31,4 @@ Thumbs.db
 
 # Exclude build and test guide documentation from repository
 docs/BUILD_AND_TEST_GUIDE.md
+docs/NEXT_FEATURES_ANALYSIS.md
