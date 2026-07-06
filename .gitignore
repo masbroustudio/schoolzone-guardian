@@ -28,3 +28,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.log
+
+# Exclude build and test guide documentation from repository
+docs/BUILD_AND_TEST_GUIDE.md
