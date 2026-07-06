@@ -1113,23 +1113,40 @@ async def chat_with_agent(req: ChatRequest):
             
             # --- ADK Feature 4: Orchestrator Agent decides target specialized agent ---
             routing_prompt = (
-                "You are the Orchestrator Agent. Classify the user query into one of three specialized sub-agents:\n"
-                "1. 'RISK_ANALYST' (If query is about daily safety index, hazards, weather, or basic lookups)\n"
-                "2. 'ROUTE_ADVISOR' (If query is about drop-off time recommendations, routes, or comparing schools)\n"
-                "3. 'ADMIN_PLANNER' (If query is about volunteers, scheduling, newsletters, or coverage gaps)\n\n"
-                f"Query: '{req.message}'\n"
-                "Reply with EXACTLY one word: RISK_ANALYST, ROUTE_ADVISOR, or ADMIN_PLANNER."
+                "You are the Orchestrator Agent for the School-Zone Guardian platform.\n"
+                "Classify the user query into EXACTLY one of three specialized sub-agents:\n\n"
+                "Specialized Agents:\n"
+                "1. 'RISK_ANALYST': Use when the user asks about a single school's baseline safety, specific weather conditions, or active hazard reports.\n"
+                "   Examples: 'What is the risk score?', 'How does rain affect the risk index?', 'Are there any double parking hazards?'\n"
+                "2. 'ROUTE_ADVISOR': Use when the user asks to compare multiple schools, find the safest school, analyze weekly temporal trends, or recommend travel windows.\n"
+                "   Examples: 'Compare risk levels across all schools', 'Which school is the safest?', 'Show me the weekly trend analysis', 'When is the safest time to drop off my children?'\n"
+                "3. 'ADMIN_PLANNER': Use when the user asks about parent volunteer rosters, scheduling guards, generating briefings, or identifying guard coverage gaps.\n"
+                "   Examples: 'Analyze volunteer coverage gaps', 'Who is scheduled for crossing guard duty?', 'Generate safety weekly briefing'\n\n"
+                f"Query: '{req.message}'\n\n"
+                "Respond with EXACTLY one of these three strings: RISK_ANALYST, ROUTE_ADVISOR, or ADMIN_PLANNER. Do not write anything else."
             )
             routing_response = client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=routing_prompt,
                 config=types.GenerateContentConfig(temperature=0.0)
             )
-            target_agent = routing_response.text.strip().upper()
-            if target_agent not in ("RISK_ANALYST", "ROUTE_ADVISOR", "ADMIN_PLANNER"):
+            print(f"DEBUG: Orchestrator raw routing response: {repr(routing_response.text)}")
+            target_agent_raw = routing_response.text.strip().upper()
+
+            # Clean formatting characters
+            for char in ["'", '"', '`', '*', '\n', '\r', '.', ' ', '[', ']']:
+                target_agent_raw = target_agent_raw.replace(char, "")
+            
+            # Robust substring matching to identify sub-agents
+            if "ROUTE_ADVISOR" in target_agent_raw or "ROUTE" in target_agent_raw or "COMPARE" in target_agent_raw or "SAFEST" in target_agent_raw:
+                target_agent = "ROUTE_ADVISOR"
+            elif "ADMIN_PLANNER" in target_agent_raw or "ADMIN" in target_agent_raw or "PLANNER" in target_agent_raw or "VOLUNTEER" in target_agent_raw:
+                target_agent = "ADMIN_PLANNER"
+            else:
                 target_agent = "RISK_ANALYST"
                 
             if target_agent == "RISK_ANALYST":
+
                 agent_name = "Risk Analyst Agent"
                 agent_instruction = (
                     "You are the 'Risk Analyst Agent'. You specialize in school profile data, crash statistics, hazards, and weather.\n"
