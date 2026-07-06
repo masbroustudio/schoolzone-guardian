@@ -1,4 +1,12 @@
-# Use official lightweight Python image
+# Stage 1: Build React frontend
+FROM node:20-alpine AS frontend-builder
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
+# Stage 2: Build Python FastAPI backend
 FROM python:3.12-slim
 
 # Set environment variables
@@ -21,6 +29,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application files
 COPY . .
+
+# Copy compiled frontend build assets from Stage 1
+COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 
 # Run the web service on container startup using Uvicorn
 CMD exec uvicorn main:app --host 0.0.0.0 --port $PORT
