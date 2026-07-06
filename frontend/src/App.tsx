@@ -153,6 +153,8 @@ function App() {
    ========================================================================== */
 function LandingPage({ navigateTo, theme, toggleTheme, user }: { navigateTo: (path: string) => void; theme: string; toggleTheme: () => void; user: any }) {
   const [sliderIndex, setSliderIndex] = useState(3);
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
 
   const timelineDemo = [
     { time: "07:00 AM", score: 12, level: "low", title: "Clear Roads", factors: ["Minimal traffic flow", "Excellent morning sunlight"] },
@@ -166,11 +168,114 @@ function LandingPage({ navigateTo, theme, toggleTheme, user }: { navigateTo: (pa
     { time: "09:00 AM", score: 10, level: "low", title: "Normal Neighborhood Flow", factors: ["Baseline street patterns"] }
   ];
 
+  const architectureSlides = [
+    {
+      title: "1. Spatial Collision GIS Joins (BigQuery)",
+      description: "Aggregates over 2.1 million NYPD crash records. Spatially intersects school coordinate buffers using BigQuery GIS commands to establish local baseline hazards.",
+      icon: "🛰️",
+      tech: ["BigQuery GIS", "NYC NYPD Data", "GIS ST_DISTANCE"]
+    },
+    {
+      title: "2. Grounded RAG Context Retrieval (Vertex AI)",
+      description: "Queries active safety matrices (weather, construction hazards, parent crossing guard rosters) and builds a grounded prompt context to prevent LLM hallucinations.",
+      icon: "💬",
+      tech: ["Vertex AI Gemini 2.5", "RAG Prompt Grounding", "FastAPI Monolith"]
+    },
+    {
+      title: "3. Workflow Event Automation (Pub/Sub)",
+      description: "Simulates Cloud Scheduler triggering Cloud Functions. recalculating risk scores and publishing warning events directly to parent alerts tables.",
+      icon: "⚙️",
+      tech: ["Cloud Scheduler", "Pub/Sub Topics", "Cloud Functions v2"]
+    },
+    {
+      title: "4. ADK Multi-Agent Orchestration (Gemini)",
+      description: "Implements coordinated sub-agents. The Orchestrator routes requests dynamically to Risk Analysts, Route Advisors, and Admin Planners, tracing executions.",
+      icon: "🤖",
+      tech: ["Agent Development Kit", "Gemini Intent Router", "Trace logs"]
+    }
+  ];
+
   const currentDemo = timelineDemo[sliderIndex];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <header>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', position: 'relative', overflow: 'hidden' }}>
+      
+      {/* Background blobs for rich aesthetics */}
+      <style>{`
+        @keyframes float {
+          0% { transform: translateY(0px) rotate(0deg); }
+          50% { transform: translateY(-10px) rotate(3deg); }
+          100% { transform: translateY(0px) rotate(0deg); }
+        }
+        @keyframes blob-bounce {
+          0% { transform: translate(0px, 0px) scale(1); }
+          33% { transform: translate(30px, -50px) scale(1.08); }
+          66% { transform: translate(-20px, 20px) scale(0.95); }
+          100% { transform: translate(0px, 0px) scale(1); }
+        }
+        .glowing-blob-1 {
+          position: absolute;
+          width: 350px;
+          height: 350px;
+          background: radial-gradient(circle, rgba(28, 176, 246, 0.12) 0%, rgba(28, 176, 246, 0) 70%);
+          filter: blur(40px);
+          top: 8%;
+          left: -5%;
+          border-radius: 50%;
+          animation: blob-bounce 12s infinite alternate ease-in-out;
+          pointer-events: none;
+        }
+        .glowing-blob-2 {
+          position: absolute;
+          width: 450px;
+          height: 450px;
+          background: radial-gradient(circle, rgba(88, 204, 2, 0.12) 0%, rgba(88, 204, 2, 0) 70%);
+          filter: blur(50px);
+          bottom: 15%;
+          right: -5%;
+          border-radius: 50%;
+          animation: blob-bounce 16s infinite alternate-reverse ease-in-out;
+          pointer-events: none;
+        }
+        .floating-mascot {
+          animation: float 6s infinite ease-in-out;
+        }
+        .features-grid-card {
+          transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+          cursor: pointer;
+        }
+        .features-grid-card:hover {
+          transform: translateY(-8px) scale(1.02);
+          box-shadow: 0 12px 0 var(--border-color-dark) !important;
+          border-color: var(--lingo-blue) !important;
+        }
+        .faq-accordion-header {
+          cursor: pointer;
+          user-select: none;
+          transition: background-color 0.1s ease;
+        }
+        .faq-accordion-header:hover {
+          background-color: var(--bg-secondary) !important;
+        }
+        .carousel-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background-color: var(--border-color);
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .carousel-dot.active {
+          background-color: var(--lingo-blue);
+          width: 24px;
+          border-radius: 6px;
+        }
+      `}</style>
+
+      <div className="glowing-blob-1"></div>
+      <div className="glowing-blob-2"></div>
+
+      <header style={{ position: 'relative', zIndex: 10 }}>
         <div className="container nav-container">
           <a href="#" onClick={(e) => { e.preventDefault(); navigateTo('/'); }} className="logo">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -195,17 +300,17 @@ function LandingPage({ navigateTo, theme, toggleTheme, user }: { navigateTo: (pa
         </div>
       </header>
 
-      <section className="hero">
+      <section className="hero" style={{ position: 'relative', zIndex: 5 }}>
         <div className="container hero-content">
           <div className="hero-text">
-            <h1>Safe Starts, <br/><span>Happy Hearts.</span></h1>
+            <h1 style={{ lineHeight: '1.2' }}>Safe Starts, <br/><span style={{ background: 'linear-gradient(135deg, var(--lingo-green) 0%, var(--lingo-blue) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Happy Hearts.</span></h1>
             <p>An AI-powered Decision Intelligence Platform predicting high-congestion risk windows. Plan safer routes, optimal drop-off timings, and coordinate safety guards.</p>
             <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
               <button onClick={() => navigateTo('/dashboard')} className="btn-tactile btn-green" style={{ fontSize: '18px', padding: '16px 32px' }}>Go to Dashboard</button>
               <a href="#demo" className="btn-tactile" style={{ fontSize: '18px', padding: '16px 32px', textDecoration: 'none', display: 'flex', alignItems: 'center' }}>See How It Works</a>
             </div>
           </div>
-          <div className="hero-mascot-container">
+          <div className="hero-mascot-container floating-mascot">
             <svg className="mascot-svg" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
               <circle cx="100" cy="110" r="70" fill="#58cc02"/>
               <circle cx="100" cy="110" r="55" fill="#a5f3fc" opacity="0.15"/>
@@ -234,7 +339,29 @@ function LandingPage({ navigateTo, theme, toggleTheme, user }: { navigateTo: (pa
         </div>
       </section>
 
-      <section id="demo" className="features-section" style={{ backgroundColor: 'var(--bg-color)' }}>
+      {/* Stats/Metrics KPI section */}
+      <section style={{ padding: '40px 0', borderTop: '2px solid var(--border-color)', borderBottom: '2px solid var(--border-color)', backgroundColor: 'var(--bg-secondary)', position: 'relative', zIndex: 5 }}>
+        <div className="container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '24px' }}>
+          <div className="lingo-card" style={{ background: 'var(--bg-color)', padding: '20px', borderRadius: '12px', border: '2px solid var(--border-color)', boxShadow: '0 4px 0 var(--border-color-dark)', textAlign: 'center' }}>
+            <div style={{ fontSize: '36px', fontWeight: 800, color: 'var(--lingo-blue)' }}>2.1M+</div>
+            <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: '4px' }}>Collision Logs Joins</div>
+          </div>
+          <div className="lingo-card" style={{ background: 'var(--bg-color)', padding: '20px', borderRadius: '12px', border: '2px solid var(--border-color)', boxShadow: '0 4px 0 var(--border-color-dark)', textAlign: 'center' }}>
+            <div style={{ fontSize: '36px', fontWeight: 800, color: 'var(--lingo-green)' }}>&lt; 45ms</div>
+            <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: '4px' }}>Inference Latency</div>
+          </div>
+          <div className="lingo-card" style={{ background: 'var(--bg-color)', padding: '20px', borderRadius: '12px', border: '2px solid var(--border-color)', boxShadow: '0 4px 0 var(--border-color-dark)', textAlign: 'center' }}>
+            <div style={{ fontSize: '36px', fontWeight: 800, color: 'var(--lingo-orange)' }}>94.8%</div>
+            <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: '4px' }}>Predictive Accuracy</div>
+          </div>
+          <div className="lingo-card" style={{ background: 'var(--bg-color)', padding: '20px', borderRadius: '12px', border: '2px solid var(--border-color)', boxShadow: '0 4px 0 var(--border-color-dark)', textAlign: 'center' }}>
+            <div style={{ fontSize: '36px', fontWeight: 800, color: 'var(--lingo-purple)' }}>450+</div>
+            <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: '4px' }}>NY School Zones</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="demo" className="features-section" style={{ backgroundColor: 'var(--bg-color)', position: 'relative', zIndex: 5 }}>
         <div className="container">
           <div className="demo-title" style={{ textAlign: 'center', marginBottom: '32px' }}>
             <h2 style={{ fontSize: '36px', marginBottom: '12px' }}>Pre-aggregate Spatial Hazards</h2>
@@ -282,8 +409,61 @@ function LandingPage({ navigateTo, theme, toggleTheme, user }: { navigateTo: (pa
         </div>
       </section>
 
+      {/* Architectural Walkthrough - CAROUSEL */}
+      <section style={{ backgroundColor: 'var(--bg-secondary)', padding: '60px 0', borderTop: '2px solid var(--border-color)', borderBottom: '2px solid var(--border-color)', position: 'relative', zIndex: 5 }}>
+        <div className="container" style={{ maxWidth: '800px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+            <h2 style={{ fontSize: '32px', marginBottom: '12px' }}>⚙️ How Data Flows — GCP Pipeline</h2>
+            <p style={{ fontSize: '16px', color: 'var(--text-secondary)' }}>Explore the architecture connecting databases, AI model tasks, and workflows.</p>
+          </div>
+
+          <div style={{ background: 'var(--bg-color)', border: '2px solid var(--border-color)', borderRadius: '16px', boxShadow: '0 6px 0 var(--border-color-dark)', padding: '32px', textAlign: 'left', minHeight: '220px', position: 'relative' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+              <span style={{ fontSize: '40px' }}>{architectureSlides[carouselIndex].icon}</span>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '20px' }}>{architectureSlides[carouselIndex].title}</h3>
+                <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                  {architectureSlides[carouselIndex].tech.map((t, idx) => (
+                    <span key={idx} className="badge-risk low" style={{ fontSize: '10px', padding: '2px 8px' }}>{t}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <p style={{ fontSize: '15px', lineHeight: '1.6', margin: 0, color: 'var(--text-secondary)', fontWeight: 600 }}>
+              {architectureSlides[carouselIndex].description}
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
+            <button 
+              onClick={() => setCarouselIndex((prev) => (prev === 0 ? architectureSlides.length - 1 : prev - 1))}
+              className="btn-tactile" 
+              style={{ padding: '8px 16px', fontSize: '12px' }}
+            >
+              ◀ Prev
+            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {architectureSlides.map((_, idx) => (
+                <span 
+                  key={idx} 
+                  onClick={() => setCarouselIndex(idx)}
+                  className={`carousel-dot ${carouselIndex === idx ? 'active' : ''}`}
+                />
+              ))}
+            </div>
+            <button 
+              onClick={() => setCarouselIndex((prev) => (prev === architectureSlides.length - 1 ? 0 : prev + 1))}
+              className="btn-tactile" 
+              style={{ padding: '8px 16px', fontSize: '12px' }}
+            >
+              Next ▶
+            </button>
+          </div>
+        </div>
+      </section>
+
       {/* Features Showcase Grid */}
-      <section className="features-showcase" style={{ backgroundColor: 'var(--bg-secondary)', padding: '60px 0', borderTop: '2px solid var(--border-color)', borderBottom: '2px solid var(--border-color)' }}>
+      <section className="features-showcase" style={{ backgroundColor: 'var(--bg-color)', padding: '60px 0', borderBottom: '2px solid var(--border-color)', position: 'relative', zIndex: 5 }}>
         <div className="container">
           <div style={{ textAlign: 'center', marginBottom: '40px' }}>
             <h2 style={{ fontSize: '32px', marginBottom: '12px' }}>🔒 Intelligent Safety Features</h2>
@@ -292,7 +472,7 @@ function LandingPage({ navigateTo, theme, toggleTheme, user }: { navigateTo: (pa
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
             {/* Feature 1 */}
-            <div className="lingo-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-color)', padding: '24px', borderRadius: '12px', border: '2px solid var(--border-color)', textAlign: 'left' }}>
+            <div className="lingo-card features-grid-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-color)', padding: '24px', borderRadius: '12px', border: '2px solid var(--border-color)', boxShadow: '0 4px 0 var(--border-color-dark)', textAlign: 'left' }}>
               <div style={{ fontSize: '32px' }}>💬</div>
               <h3 style={{ margin: 0 }}>RAG-Grounded Safety Chat</h3>
               <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>
@@ -301,7 +481,7 @@ function LandingPage({ navigateTo, theme, toggleTheme, user }: { navigateTo: (pa
             </div>
 
             {/* Feature 2 */}
-            <div className="lingo-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-color)', padding: '24px', borderRadius: '12px', border: '2px solid var(--border-color)', textAlign: 'left' }}>
+            <div className="lingo-card features-grid-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-color)', padding: '24px', borderRadius: '12px', border: '2px solid var(--border-color)', boxShadow: '0 4px 0 var(--border-color-dark)', textAlign: 'left' }}>
               <div style={{ fontSize: '32px' }}>🔍</div>
               <h3 style={{ margin: 0 }}>Explainable AI Risk Breakdown</h3>
               <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>
@@ -310,7 +490,7 @@ function LandingPage({ navigateTo, theme, toggleTheme, user }: { navigateTo: (pa
             </div>
 
             {/* Feature 3 */}
-            <div className="lingo-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-color)', padding: '24px', borderRadius: '12px', border: '2px solid var(--border-color)', textAlign: 'left' }}>
+            <div className="lingo-card features-grid-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-color)', padding: '24px', borderRadius: '12px', border: '2px solid var(--border-color)', boxShadow: '0 4px 0 var(--border-color-dark)', textAlign: 'left' }}>
               <div style={{ fontSize: '32px' }}>📈</div>
               <h3 style={{ margin: 0 }}>BigQuery ML ARIMA Forecasting</h3>
               <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>
@@ -319,7 +499,7 @@ function LandingPage({ navigateTo, theme, toggleTheme, user }: { navigateTo: (pa
             </div>
 
             {/* Feature 4 */}
-            <div className="lingo-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-color)', padding: '24px', borderRadius: '12px', border: '2px solid var(--border-color)', textAlign: 'left' }}>
+            <div className="lingo-card features-grid-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-color)', padding: '24px', borderRadius: '12px', border: '2px solid var(--border-color)', boxShadow: '0 4px 0 var(--border-color-dark)', textAlign: 'left' }}>
               <div style={{ fontSize: '32px' }}>⚙️</div>
               <h3 style={{ margin: 0 }}>Scheduler & Pub/Sub Automation</h3>
               <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>
@@ -328,7 +508,7 @@ function LandingPage({ navigateTo, theme, toggleTheme, user }: { navigateTo: (pa
             </div>
 
             {/* Feature 5 */}
-            <div className="lingo-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-color)', padding: '24px', borderRadius: '12px', border: '2px solid var(--border-color)', textAlign: 'left' }}>
+            <div className="lingo-card features-grid-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-color)', padding: '24px', borderRadius: '12px', border: '2px solid var(--border-color)', boxShadow: '0 4px 0 var(--border-color-dark)', textAlign: 'left' }}>
               <div style={{ fontSize: '32px' }}>🤖</div>
               <h3 style={{ margin: 0 }}>ADK Multi-Agent Orchestration</h3>
               <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>
@@ -337,7 +517,7 @@ function LandingPage({ navigateTo, theme, toggleTheme, user }: { navigateTo: (pa
             </div>
 
             {/* Feature 6 */}
-            <div className="lingo-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-color)', padding: '24px', borderRadius: '12px', border: '2px solid var(--border-color)', textAlign: 'left' }}>
+            <div className="lingo-card features-grid-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-color)', padding: '24px', borderRadius: '12px', border: '2px solid var(--border-color)', boxShadow: '0 4px 0 var(--border-color-dark)', textAlign: 'left' }}>
               <div style={{ fontSize: '32px' }}>🗺️</div>
               <h3 style={{ margin: 0 }}>Spatial Incident GIS Join</h3>
               <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>
@@ -348,7 +528,50 @@ function LandingPage({ navigateTo, theme, toggleTheme, user }: { navigateTo: (pa
         </div>
       </section>
 
-      <footer style={{ marginTop: 'auto', borderTop: '2px solid var(--border-color)', padding: '16px 0', textAlign: 'center' }}>
+      {/* Accordions FAQ Section */}
+      <section style={{ padding: '60px 0', borderBottom: '2px solid var(--border-color)', position: 'relative', zIndex: 5 }}>
+        <div className="container" style={{ maxWidth: '800px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+            <h2 style={{ fontSize: '32px', marginBottom: '12px' }}>❓ Frequently Asked Questions</h2>
+            <p style={{ fontSize: '16px', color: 'var(--text-secondary)' }}>Everything you need to know about the School-Zone Guardian platform.</p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {[
+              {
+                q: "How is the 15-minute Temporal Risk Score calculated?",
+                a: "The Risk Safety Index is computed using real-time physical parameters: baseline historical NYPD collision coordinates within a 300m buffer, bell-time congestion variables, live rain forecasts from the Open-Meteo API, parent compliance ratios, and crossing guard coverage. No demographic or census variables are ever included."
+              },
+              {
+                q: "How does Vertex AI Retrieval-Augmented Generation (RAG) protect data?",
+                a: "Our platform implements zero-hallucination grounded chat by querying BigQuery and local SQL rosters before calling Gemini. The retrieved data context is injected directly into Gemini's system prompt space, requiring strict citations ([DOC 1]) to prevent any AI hallucinations."
+              },
+              {
+                q: "What is the BigQuery ML ARIMA forecasting model?",
+                a: "ARIMA (Autoregressive Integrated Moving Average) is a statistical time-series model. We train the model directly in BigQuery using SQL commands to project daily safety risk rates based on seasonal collision density, making it extremely lightweight and cost-effective."
+              }
+            ].map((faq, idx) => (
+              <div key={idx} style={{ background: 'var(--bg-secondary)', border: '2px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', textAlign: 'left', boxShadow: '0 3px 0 var(--border-color-dark)' }}>
+                <div 
+                  onClick={() => setFaqOpenIndex(faqOpenIndex === idx ? null : idx)}
+                  className="faq-accordion-header"
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', fontWeight: 800, fontSize: '15px', background: 'var(--bg-color)' }}
+                >
+                  <span>{faq.q}</span>
+                  <span style={{ fontSize: '20px', transform: faqOpenIndex === idx ? 'rotate(45deg)' : 'rotate(0deg)', transition: 'transform 0.2s', color: 'var(--lingo-blue)' }}>＋</span>
+                </div>
+                {faqOpenIndex === idx && (
+                  <div style={{ padding: '16px 20px', fontSize: '14px', color: 'var(--text-secondary)', borderTop: '2px solid var(--border-color)', lineHeight: '1.6', background: 'var(--bg-color)', fontWeight: 600 }}>
+                    {faq.a}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <footer style={{ marginTop: 'auto', borderTop: '2px solid var(--border-color)', padding: '16px 0', textAlign: 'center', position: 'relative', zIndex: 5 }}>
         <p>&copy; 2026 School-Zone Guardian. Built for Google Cloud Hackathon. All rights reserved.</p>
       </footer>
     </div>
